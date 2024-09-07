@@ -9,7 +9,11 @@
   "author": "omagaowi",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
     "express": "^4.19.2",
-    "nodemon": "^3.1.4"
+    "mongodb": "^6.8.0",
+    "nodemon": "^3.1.4",
+    "socket.io": "^4.7.5"
   }
 }
