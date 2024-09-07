@@ -37,21 +37,22 @@ io.on("connection", (socket) => {
 
 // app.use(bodyParser)
 
-let db;
-connectToDb((err) => {
-  if (!err) {
-    db = getDb();
-    console.log("connected to database");
-    app.listen(3000);
-  } else {
-    console.log(err);
-  }
-});
+// let db;
+// connectToDb((err) => {
+//   if (!err) {
+//     db = getDb();
+//     console.log("connected to database");
+//     app.listen(3000);
+//   } else {
+//     console.log(err);
+//   }
+// });
 
 
 
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
 app.use(bodyParser.json());
 
