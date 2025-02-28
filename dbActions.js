@@ -18,6 +18,19 @@ const dbGetRoomByID = async (db, roomID) => {
     }
 }
 
+const dbUpdateRoom = async (db, data) => {
+    try {
+      const result = await db.collection("rooms").findOneAndUpdate(
+        { roomID: data.roomID }, // Filter to find the document
+        { $set: data },
+        { returnDocument: "after" } // Return the new document
+      );
+      return result;
+    } catch (error) {
+      throw error;
+    }
+}
+
 const dbAddPlayer = async (db, data) => {
     try {
         const result = await db.collection('players').insertOne(data)
@@ -74,4 +87,4 @@ const dbGetPlayerBySocketID = async (db, socketID) => {
          }
 }
 
-module.exports = { dbNewRoom, dbGetRoomByID, dbAddPlayer, dbGetAllPlayers, dbGetPlayerByID , dbUpdatePlayer, dbGetPlayerBySocketID}
+module.exports = { dbNewRoom, dbGetRoomByID, dbAddPlayer, dbGetAllPlayers, dbGetPlayerByID , dbUpdatePlayer, dbGetPlayerBySocketID, dbUpdateRoom}

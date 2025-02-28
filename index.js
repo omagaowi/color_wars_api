@@ -5,7 +5,7 @@ const bodyParser = require('body-parser')
 const socketIo = require("socket.io");
 const http = require("http");
 const { debug, error } = require('console');
-const { dbNewRoom, dbGetRoomByID, dbGetPlayerByID, dbAddPlayer, dbUpdatePlayer, dbGetAllPlayers, dbGetPlayerBySocketID } = require('./dbActions');
+const { dbNewRoom, dbGetRoomByID, dbGetPlayerByID, dbAddPlayer, dbUpdatePlayer, dbGetAllPlayers, dbGetPlayerBySocketID, dbUpdateRoom } = require('./dbActions');
 
 const app = express()
 
@@ -182,6 +182,31 @@ const removePlayerFromRoom = async (socketID, callback) => {
   })
 }
 
+const startGame = async (data, callback) => {
+   console.log("game started", data);
+     const newData = {
+       roomID: data.room.roomID,
+       roomUID: data.room.roomUID,
+       createdAt: data.room.createdAt,
+       status: data.room.status,
+       players: data.players,
+     };
+     dbUpdateRoom(db, newData).then(result => {
+      console.log(result)
+      callback({
+        status: true,
+        data: result,
+        error: false
+      })
+     }).catch(error => {
+      callback({
+        status: false,
+        data: false,
+        error: "Database Error",
+      });
+     })
+}
+
 const getPlayersByRoom = async (data, callback) => {
   dbGetAllPlayers(db).then(players => {
     // console.log(data)
@@ -244,6 +269,32 @@ io.on("connection", (socket) => {
          io.to(socket.id).emit("joinError", playerError);
       }
     })
+  })
+
+  socket.on('play', (data) => {
+    console.log('play', data)
+    io.to(Number(data.room.roomID)).emit('play', data)
+  })
+
+  socket.on('startGame', (data) => {
+    startGame(data, ({ status: startStatus, error: startError, data: startData }) =>{
+      console.log(startData, startStatus, startError)
+      if(startStatus){
+        io.to(Number(data.room.roomID)).emit("startGame", {
+          room: startData,
+          player: data.player,
+          players: startData.players,
+          gameInfo: data.gameInfo
+        });
+      }else{
+
+      }
+    })
+    // dbUpdateRoom(db, data.room).then(result => {
+    //   console.log(result)
+    // }).catch(error => {
+    //   console.log(error)
+    // })
   })
 
   // Send a message to the client
