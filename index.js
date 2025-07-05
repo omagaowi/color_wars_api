@@ -5,7 +5,7 @@ const bodyParser = require('body-parser')
 const socketIo = require("socket.io");
 const http = require("http");
 const { debug, error } = require('console');
-const { dbNewRoom, dbGetRoomByID, dbGetPlayerByID, dbAddPlayer, dbUpdatePlayer, dbGetAllPlayers, dbGetPlayerBySocketID, dbUpdateRoom } = require('./dbActions');
+const { dbNewRoom, dbGetRoomByID, dbGetPlayerByID, dbAddPlayer, dbUpdatePlayer, dbGetAllPlayers, dbGetPlayerBySocketID, dbUpdateRoom, dbNewResult, dbGetresultByRoomID, dbDeleteResultByRoomId } = require('./dbActions');
 
 const app = express()
 
@@ -188,8 +188,11 @@ const startGame = async (data, callback) => {
        roomID: data.room.roomID,
        roomUID: data.room.roomUID,
        createdAt: data.room.createdAt,
-       status: data.room.status,
-       players: data.players,
+       status: 'closed',
+       players: data.players.map(player => ({
+        ...player,
+        eliminated: false
+     })),
      };
      dbUpdateRoom(db, newData).then(result => {
       console.log(result)
@@ -297,6 +300,12 @@ io.on("connection", (socket) => {
     // })
   })
 
+
+  socket.on('timeout', (data) => {
+      console.log("timeout", data);
+      io.to(Number(data.room.roomID)).emit("timeout", data);
+  })
+
   // Send a message to the client
   // socket.emit("messageFromServer", "Hello from server!");
 
@@ -304,27 +313,115 @@ io.on("connection", (socket) => {
   //   console.log(data);
   // });
 
-  // Handle client disconnect
-  socket.on("disconnect", () => {
-    removePlayerFromRoom(socket.id, ({status: playerStatus, data: playerData, error: playerError }) =>{
-      if(playerStatus){
-         getPlayersByRoom(playerData.room, ({ status: roomPlayerStatus, data: roomPlayerData, error: roomPlayerError }) => {
-          if(roomPlayerStatus){
-            io.to(Number(playerData.room.roomID)).emit("users", {
-              player: playerData.player,
-              room: playerData.room,
-              players: roomPlayerData,
-              action: "left",
-            });
-            if(roomPlayerData.length <= 1){
-              
-            }
-          }else{
+  socket.on('endGame', (data) => {
+    io.to(Number(data.room.roomID)).emit(
+      "ended",
+        `${ data.player.name } ended the game`
+    );
+  })
 
+  socket.on("resultEnd", (data) => {
+    console.log("resultEnd", data);
+    dbGetRoomByID(db, data.room.roomID).then(result => {
+      console.log('res', result)
+      if(result){
+         let playerResults = [];
+        data.eliminated.forEach(player =>{
+          const findPlayer = data.room.players.find(function(el){ return el.color.color == player })
+          if(findPlayer){
+            playerResults.push(findPlayer)
           }
-         })
+        })
+        playerResults = playerResults.reverse()
+        const newResult = {
+          roomID: result.roomID,
+          roomUID: result.roomID,
+          results: playerResults
+        }
+        dbDeleteResultByRoomId(db, newResult.roomID).then(result => {
+          dbNewResult(db, newResult)
+            .then((result) => {
+              io.to(Number(newResult.roomID)).emit("results", newResult);
+            })
+            .catch((error) => {});
+        }).catch(error => {
+
+        })
       }
     })
+  });
+
+
+  // Handle client disconnect
+
+  const disconnect = () => {
+     removePlayerFromRoom(
+       socket.id,
+       ({ status: playerStatus, data: playerData, error: playerError }) => {
+         if (playerStatus) {
+           getPlayersByRoom(
+             playerData.room,
+             ({
+               status: roomPlayerStatus,
+               data: roomPlayerData,
+               error: roomPlayerError,
+             }) => {
+               if (roomPlayerStatus) {
+                 console.log(playerData.room.players);
+                 if (!playerData.room.players) {
+                   // game has started
+                   io.to(Number(playerData.room.roomID)).emit("users", {
+                     player: playerData.player,
+                     room: playerData.room,
+                     players: roomPlayerData,
+                     action: "left",
+                   });
+                 } else {
+                   const playerList1 = playerData.room.players;
+                   // console.log(playerList1, roomPlayerData)
+                   let newPlayerList = [];
+                   playerList1.forEach((player) => {
+                     const findRoom = roomPlayerData.find(function (el) {
+                       return el.playerID == player.playerID;
+                     });
+                     const newPlayer = {
+                       ...player,
+                       status: findRoom ? "online" : "offline",
+                     };
+                     newPlayerList.push(newPlayer);
+                   });
+                   // console.log(newPlayerList)
+                   if (newPlayerList.length == playerList1.length) {
+                     io.to(Number(playerData.room.roomID)).emit("users", {
+                       player: playerData.player,
+                       room: playerData.room,
+                       players: newPlayerList,
+                       action: "left",
+                     });
+
+                     if (roomPlayerData.length <= 1) {
+                       io.to(Number(playerData.room.roomID)).emit(
+                         "ended",
+                         "no players left in the game"
+                       );
+                     }
+                   }
+                 }
+               } else {
+               }
+             }
+           );
+         }
+       }
+     );
+  }
+
+  socket.on('leave', () => {
+     disconnect()
+  })
+
+  socket.on("disconnect", () => {
+    disconnect()
     console.log("Client disconnected", socket.id);
   });
 });
@@ -359,6 +456,22 @@ app.post('/room/create', (req, res)=>{
   // console.log(roomID)
 })
 
+
+app.get('/game/result/:roomID', (req, res) => {
+  console.log(Number(req.params.roomID))
+  dbGetresultByRoomID(db, Number(req.params.roomID))
+    .then((result) => {
+      console.log(result)
+      if(result){
+        res.status(200).json(result);
+      }else{
+        res.status(500).send("Unable to find Result");
+      }
+    })
+    .catch((error) => {
+        res.status(500).send("Database Error");
+    });
+})
 
 
 app.post('/room/join', (req, res)=>{

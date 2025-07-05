@@ -76,6 +76,26 @@ const dbGetAllPlayers = async (db) => {
     }
 }
 
+const dbNewResult = async (db, data) => {
+   try {
+     const result = await db.collection("results").insertOne(data);
+     return result;
+   } catch (error) {
+     throw error;
+   }
+}
+
+const dbGetresultByRoomID = async (db, roomID) => {
+  try {
+    const result = await db.collection("results").findOne({
+      roomID: Number(roomID),
+    });
+    return result;
+  } catch (error) {
+    throw error;
+  }
+};
+
 const dbGetPlayerBySocketID = async (db, socketID) => {
          try {
            const result = await db.collection("players").findOne({
@@ -87,4 +107,15 @@ const dbGetPlayerBySocketID = async (db, socketID) => {
          }
 }
 
-module.exports = { dbNewRoom, dbGetRoomByID, dbAddPlayer, dbGetAllPlayers, dbGetPlayerByID , dbUpdatePlayer, dbGetPlayerBySocketID, dbUpdateRoom}
+const dbDeleteResultByRoomId = async (db, roomID) => {
+   try {
+    const result = await db.collection("results").deleteMany({  
+      roomID: Number(roomID),
+    });
+    return result;
+  } catch (error) {
+    throw error;
+  }
+}
+
+module.exports = { dbNewRoom, dbGetRoomByID, dbDeleteResultByRoomId, dbGetresultByRoomID, dbNewResult, dbAddPlayer, dbGetAllPlayers, dbGetPlayerByID , dbUpdatePlayer, dbGetPlayerBySocketID, dbUpdateRoom}
